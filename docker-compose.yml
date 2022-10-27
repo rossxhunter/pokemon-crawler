@@ -1,12 +1,42 @@
 version: "3.9"
-   
+
 services:
   db:
     image: postgres
+    # Using environment variables from .env file here instead
     environment:
-      - POSTGRES_DB=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    # Port mapping
+    ports:
+      - "5432:5432"
+
+  rabbit:
+    hostname: rabbit
+    image: arm64v8/rabbitmq:3.11.2-management
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=mypass
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A app worker --loglevel=INFO
+    volumes:
+      - .:/code
+    links:
+      - db
+      - rabbit
+    depends_on:
+      - rabbit
+    env_file:
+      - .env
+      
   web:
     build: .
     command: python manage.py runserver 0.0.0.0:8000
@@ -16,3 +46,5 @@ services:
       - "8000:8000"
     depends_on:
       - db
+    env_file:
+      - .env
